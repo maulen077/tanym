@@ -11,6 +11,7 @@ class UserAnswer extends Model
 
     protected $fillable = [
         'user_id',
+        'game_id',
         'answer_id',
         'match_id'
     ];

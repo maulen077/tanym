@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\Game\GameResultResource;
 use App\Http\Resources\Api\Game\RoundResource;
 use App\Http\Resources\Api\Game\GameResource;
+use App\Models\Answer;
 use App\Models\Cat;
+use App\Models\CorrectAnswer;
 use App\Models\Level;
 use App\Models\Matches;
 use App\Models\UserAnswer;
@@ -25,7 +27,6 @@ class GameController extends Controller
 //        $request->validate([
 //            'status' => ['required', Rule::in(['active', 'end'])],
 //        ]);
-
 //        $user = User::find($request->user_id);
 //
 //        if (!$user){
@@ -40,7 +41,6 @@ class GameController extends Controller
             'status' => 'active',
         ]);
 
-
         for ($level = 1; $level <= 3; $level++) {
             $levelModel = Level::create(['game_id' => $data['game']->id, 'number' => $level, 'point' => $level * 20, 'life' => 3]);
             $data['levels'][] = $levelModel;
@@ -54,34 +54,22 @@ class GameController extends Controller
                     'level_id' => $levelModel->id,
                     //add level 1-2-3 60round 1-20 1 lvl , 20-40 2 lvl, 40-60 3 lvl
                 ]);
-
-
             }
-
-
         }
 
-
-
-
         //40 round
-
         //40random questions
 
    //     [
     //        'game'
       //      'rounds' ---> suraktar
         //]
-
         return response()->json($data,200);
-
     }
 
     public function showRound(Request $request)
     {
-
         $game = Game::find($request->game_id);
-
         if (!$game) {
             return response()->json([
                 'message' => 'not found'
@@ -142,38 +130,80 @@ class GameController extends Controller
         return response()->json($data, 200);
     }
 
-
-
-    public function StoreRound(Request $request)
+    public function storeRound(Request $request)
     {
+
         $request->validate([
-            'game_id' => 'required|exists:games, id',
-            'round_id' => 'required|exists:rounds,id',
-            'answer_id' => 'required|exists:answers, id',
+            'game_id' => 'required|exists:games,id',
+            'match_id' => 'required|exists:matches,id',
+            'answer_id' => 'required|exists:answers,id',
         ]);
 
+        $user = $request->user();
+          UserAnswer::create([
+                'user_id' => $user->id,
+                'game_id' => $request->game_id,
+                'match_id' => $request->match_id,
+                'answer_id' => $request->answer_id,
+            ]);
 
-        $userAnswer = UserAnswer::create([
-            'game_id' => $request->game_id,
-            'round_id' => $request->round_id,
-            'user_id' => auth()->id(),
-            'answer_id' => $request->answer_id,
-        ]);
+        if(!CorrectAnswer::whereQuestionId($request['question_id'])->whereAnswerId($request['answer_id'])->exists()){
+            Level::whereId($request['level_id'])->decrement('life' , 1);
+
+            }else{
+            //FIXME
+                //game store points 0
+            Level::whereId($request['level_id'])->increment('point' , 1);
+
+            }
 
         return response()->json([
-            'message' => 'Успешно',
-            'data' => $userAnswer,
+                'message' => 'Correct answer',
+                'data' =>  Level::whereId($request['level_id'])->select('life', 'point')->first(),
+
+        ], 200);
+
+    }
+
+    public function refreshGame(Request $request)
+    {
+        //exists Level model
+        $request->validate([
+            'level_id' => 'required|integer|exists:levels,id|min:1|max:3'
         ]);
+
+        $level = Level::find($request['level_id']);
+
+        if ($level->life > 1) {
+            $count = Matches::whereLevelId($request['level_id'])->count();
+
+            for ($roundNumber = 1; $roundNumber <= $count; $roundNumber++) {
+                $randomQuestion = Question::inRandomOrder()->value('id');
+                 Matches::where('round', $roundNumber)
+                    ->where('level_id', $level->id)
+                    ->update(['question_id' => $randomQuestion]);
+
+            }
+
+           $matchIds = Matches::where('level_id', $level->id)
+                ->pluck('id');
+            UserAnswer::whereIn('match_id',$matchIds)->delete();
+
+
+            return response()->json([
+                'message' => 'refreshed',
+            ], 200);
+        }
+        return response()->json([
+            'message' => 'life count error',
+        ],400);
     }
 
     public function endGame(Request $request)
     {
-        $gameId = $request->input('game_id');
-        $game = Game::findOrFail($gameId);
-        $game->status = 'end';
-        $game->save();
+         Game::whereId($request['game_id'])->update(['status' => 'end']);
 
-        return new GameResultResource($game);
+        return response()->json(['message'=> 'game end'] , 200);
     }
 
     public function showUserGame(Request $request)
@@ -183,11 +213,6 @@ class GameController extends Controller
             ->orderby('create_at', 'desc')
             ->first();
 
-        if (!$lastGame) {
-            return response()->json([
-                'message' => 'игра не найдена'
-            ],404);
-        }
         return new GameResource($lastGame);
     }
 

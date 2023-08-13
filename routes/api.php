@@ -27,10 +27,11 @@ Route::controller(ListController::class)->prefix('list')->group(function (){
 
 Route::controller(GameController::class)->prefix('game')->group(function () {
     Route::post('store', 'store')->middleware('auth:sanctum');
-    Route::get('show/round', 'showRound');
-    Route::get('round/solo', 'roundSoloShow');
-    Route::post('store/round', 'storeRound');
-    Route::post('end/{gameId}', 'endGame');
+    Route::get('show/round', 'showRound')->middleware('auth:sanctum');
+    Route::get('round/solo', 'roundSoloShow')->middleware('auth:sanctum');
+    Route::post('store/round', 'storeRound')->middleware('auth:sanctum');
+    Route::get('refresh', 'refreshGame')->middleware('auth:sanctum');
+    Route::post('end/{gameId}', 'endGame')->middleware('auth:sanctum');
 });
 
 
