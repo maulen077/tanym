@@ -89,7 +89,7 @@ class GameController extends Controller
             'level_id' => $request['level_id'],
             'cat_name' => Cat::whereId($game->cat_id)->value('name'),
             'current_round' => $currentRoundId != null ? Matches::whereId($currentRoundId)->value('round') : 1,
-            'current_level' => $currentRoundId != null ? Matches::whereId($currentRoundId)->value('level') : 1,
+            'current_level' => $currentRoundId != null ? Matches::whereId($currentRoundId)->value('level_id') : 1,
 
     //            'rounds' => $game->rounds->map(function ($round){
 //                return [
